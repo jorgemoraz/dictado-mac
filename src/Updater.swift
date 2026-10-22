@@ -5,7 +5,7 @@ import Darwin
 /// consulta el último commit de main y, si es nuevo, lanza instalar.sh, que compila
 /// esa versión en este Mac, la firma con la identidad local y reinicia la app.
 @MainActor final class AppUpdater: ObservableObject {
-    static let repo = "jorgemoraz/dictado-mac"
+    nonisolated static let repo = "jorgemoraz/dictado-mac"
     @Published var status = ""
     @Published private(set) var updating = false
     private var timer: Timer?
@@ -13,7 +13,7 @@ import Darwin
     static var support: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/DictadoMac")
     }
-    static var logPath: String {
+    nonisolated static var logPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/DictadoMac-update.log").path
     }
     /// Solo las copias instaladas con instalar.sh llevan el commit y se actualizan solas.
