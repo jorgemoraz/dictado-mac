@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>DictadoMac</string>
+<key>CFBundleIdentifier</key><string>es.jorge.dictadomac</string>
+<key>CFBundleDisplayName</key><string>Dictado Mac</string>
+<key>CFBundleName</key><string>Dictado Mac</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>5.3</string>
+<key>CFBundleVersion</key><string>530</string>
+<key>LSMinimumSystemVersion</key><string>26.0</string>
+<key>NSMicrophoneUsageDescription</key><string>Transcribir tu voz con el motor nativo del Mac mientras mantienes Fn.</string>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+<key>NSSupportsAutomaticTermination</key><false/>
+<key>NSSupportsSuddenTermination</key><false/>
+</dict></plist>
