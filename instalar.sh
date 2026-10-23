@@ -78,7 +78,9 @@ CFG
 fi
 
 if [[ -z "$SHA" ]]; then
-  SHA="$(curl -fsSL -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$REPO/commits/main")" \
+  # Último commit que cambia la app de Mac (src/), el mismo que comprueba la app para actualizarse.
+  SHA="$(curl -fsSL "https://api.github.com/repos/$REPO/commits?sha=main&path=src&per_page=1" \
+    | sed -n 's/.*"sha": *"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)" \
     || fail "No se ha podido consultar GitHub."
 fi
 [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || fail "Commit no válido: $SHA"

@@ -8,8 +8,9 @@ struct SharedDictionary: Codable, Equatable, Sendable {
     var eliminados: [String] = []
     var actualizado: Date = .distantPast
 
+    /// Mismo contenido sin importar el orden: Windows ordena distinto y no debe provocar reescrituras.
     func sameContent(as other: SharedDictionary) -> Bool {
-        terminos == other.terminos && correcciones == other.correcciones && eliminados == other.eliminados
+        Set(terminos) == Set(other.terminos) && correcciones == other.correcciones && Set(eliminados) == Set(other.eliminados)
     }
 
     /// Une dos copias. Lo borrado no reaparece desde otro Mac (salvo que se vuelva a

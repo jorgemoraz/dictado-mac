@@ -90,14 +90,16 @@ import Darwin
         }
     }
 
+    /// Último commit de main que cambia la app de Mac (src/): los cambios de Windows no la reinstalan.
     nonisolated static func latest() async -> String? {
-        guard let url = URL(string: "https://api.github.com/repos/\(repo)/commits/main") else { return nil }
+        guard let url = URL(string: "https://api.github.com/repos/\(repo)/commits?sha=main&path=src&per_page=1") else { return nil }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
-        request.setValue("application/vnd.github.sha", forHTTPHeaderField: "Accept")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("DictadoMac", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let sha = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let commits = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              let sha = commits.first?["sha"] as? String,
               sha.count == 40, sha.allSatisfy(\.isHexDigit) else { return nil }
         return sha
     }

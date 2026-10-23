@@ -1,0 +1,36 @@
+name: Windows
+on:
+  push:
+    branches: [main]
+    paths: ['windows/**', '.github/workflows/windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Pruebas
+        run: dotnet test windows/Core.Tests -c Release
+      - name: Comprobar el instalador
+        shell: pwsh
+        run: $null = [scriptblock]::Create((Get-Content windows/instalar.ps1 -Raw))
+      - name: Compilar y empaquetar
+        shell: pwsh
+        run: |
+          $version = "1.0.${{ github.run_number }}"
+          dotnet publish windows/App -c Release -o publish -p:Version=$version -p:InformationalVersion=$version
+          Remove-Item publish/runtimes/win-arm64, publish/runtimes/win-x86 -Recurse -Force -ErrorAction SilentlyContinue
+          if (-not (Test-Path publish/runtimes/win-x64/whisper.dll)) { throw 'Falta whisper.dll en el paquete.' }
+          Compress-Archive -Path publish/* -DestinationPath DictadoWindows.zip
+          "VERSION=$version" >> $env:GITHUB_ENV
+      - name: Publicar la versión
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: gh release create "windows-v$env:VERSION" DictadoWindows.zip --title "Dictado para Windows $env:VERSION" --notes "Compilada automáticamente desde ${{ github.sha }}." --latest=false

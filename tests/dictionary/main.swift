@@ -27,6 +27,8 @@ let afterReadd = SharedDictionary.merge(afterDelete, readded)
 check(afterReadd.terminos, ["Heraldo", "Xalok", "Zaragoza"], "volver a añadir algo borrado")
 check(afterReadd.eliminados, ["eraldo"], "el borrado anulado desaparece")
 
+check(SharedDictionary(terminos: ["a", "B"]).sameContent(as: SharedDictionary(terminos: ["B", "a"])), true, "el orden no cuenta como cambio")
+
 let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
 let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
 let roundTrip = try! decoder.decode(SharedDictionary.self, from: try! encoder.encode(merged))

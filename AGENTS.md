@@ -7,3 +7,5 @@
 - No cambies el identificador `es.jorge.dictadomac`, el nombre del certificado ni la etiqueta del agente: los permisos de macOS dependen de ellos.
 - Nada de credenciales, claves ni datos personales en el repositorio (es público). El diccionario personal se sincroniza por iCloud Drive (`DictionarySync.swift`); nunca lo copies aquí.
 - Textos de la interfaz en español peninsular, horas con punto (23.00).
+- Windows (`windows/`): .NET 8, WinForms, Whisper.net y NAudio. El núcleo (`windows/Core`) es multiplataforma y tiene pruebas xUnit (`dotnet test windows/Core.Tests`); mantén su lógica alineada con la de Mac (atajos, puntuación, diccionario). Cada push a `windows/` publica una versión en Releases que los PCs instalan solos.
+- Los Macs solo se actualizan con commits que tocan `src/`.
