@@ -25,4 +25,4 @@ Cada 10 minutos la app consulta el último commit de `main`. Si es nuevo, ejecut
 - Atajos para mantener pulsado: Fn, ⌃ + ⌥ izquierdos o los que grabes (incluidas teclas F y combinaciones con tecla). ⌃⌥Espacio para empezar y terminar sin mantener.
 - Preguntas por la entonación: si el tono sube al final, «Vienes mañana.» pasa a «¿Vienes mañana?».
 - Revisión opcional con IA local (solo puntuación, mayúsculas y tildes; nunca cambia palabras ni cifras).
-- Diccionario personal y sustituciones explícitas.
+- Diccionario personal y sustituciones explícitas, compartidos entre todos tus Macs por iCloud Drive (`iCloud Drive/Dictado Mac/diccionario.json`). Lo que añadas o quites en un Mac aparece en los demás en menos de un minuto. El diccionario nunca se sube a este repositorio. La primera vez macOS pide permiso para que Dictado Mac use iCloud Drive.

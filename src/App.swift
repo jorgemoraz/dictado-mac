@@ -104,6 +104,10 @@ private final class IndicatorPanel: NSPanel {
     @Published var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
     @Published var vocabulary = UserDefaults.standard.stringArray(forKey: "vocabulario") ?? []
     @Published var corrections = UserDefaults.standard.dictionary(forKey: "correcciones") as? [String: String] ?? [:]
+    @Published var dictionaryStatus = ""
+    private var removedEntries = UserDefaults.standard.stringArray(forKey: "eliminados") ?? []
+    private var dictionaryUpdated = UserDefaults.standard.object(forKey: "diccionarioActualizado") as? Date ?? .distantPast
+    private var dictionarySync: DictionarySync?
     @Published var polish = UserDefaults.standard.object(forKey: "correccionContextual") as? Bool ?? true {
         didSet { UserDefaults.standard.set(polish, forKey: "correccionContextual") }
     }
@@ -395,19 +399,68 @@ private final class IndicatorPanel: NSPanel {
         } else if phase == .ready { recoverAfterWake() }
     }
     func copy() { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string) }
+    func startDictionarySync() {
+        let sync = DictionarySync(
+            current: { [unowned self] in
+                SharedDictionary(terminos: self.vocabulary, correcciones: self.corrections,
+                                 eliminados: self.removedEntries, actualizado: self.dictionaryUpdated)
+            },
+            apply: { [weak self] merged in self?.applySharedDictionary(merged) },
+            report: { [weak self] status in self?.dictionaryStatus = status })
+        dictionarySync = sync
+        sync.start()
+    }
+    /// Cambios llegados desde otro Mac a través de iCloud Drive.
+    private func applySharedDictionary(_ merged: SharedDictionary) {
+        let vocabularyChanged = merged.terminos != vocabulary
+        vocabulary = merged.terminos
+        corrections = merged.correcciones
+        removedEntries = merged.eliminados
+        dictionaryUpdated = merged.actualizado
+        persistDictionary()
+        if vocabularyChanged && !busy { engine?.cancel(); engine = nil; preparing?.cancel(); preparing = nil; prepare() }
+    }
+    private func persistDictionary() {
+        UserDefaults.standard.set(vocabulary, forKey: "vocabulario")
+        UserDefaults.standard.set(corrections, forKey: "correcciones")
+        UserDefaults.standard.set(removedEntries, forKey: "eliminados")
+        UserDefaults.standard.set(dictionaryUpdated, forKey: "diccionarioActualizado")
+    }
+    /// Cambio hecho en este Mac: se guarda y se comparte con los demás.
+    private func dictionaryChangedLocally(reloadEngine: Bool) {
+        dictionaryUpdated = Date()
+        persistDictionary()
+        dictionarySync?.sync()
+        if reloadEngine && !busy { engine?.cancel(); engine = nil; preparing?.cancel(); preparing = nil; prepare() }
+    }
     func saveVocabulary(_ term: String) {
         let clean = term.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty, !vocabulary.contains(clean) else { return }
+        guard !clean.isEmpty, !vocabulary.contains(where: { $0.lowercased() == clean.lowercased() }) else { return }
         vocabulary.append(clean); vocabulary.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-        UserDefaults.standard.set(vocabulary, forKey: "vocabulario")
-        if !busy { engine?.cancel(); engine = nil; preparing?.cancel(); preparing = nil; prepare() }
+        removedEntries.removeAll { $0 == clean }
+        dictionaryChangedLocally(reloadEngine: true)
+    }
+    /// Quita un término o una sustitución (por su origen) en todos los Macs.
+    func removeDictionaryEntry(_ entry: String) {
+        let clean = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hadTerm = vocabulary.contains(clean)
+        guard hadTerm || corrections[clean] != nil else {
+            message = "«\(clean)» no está en el diccionario."
+            return
+        }
+        vocabulary.removeAll { $0 == clean }
+        corrections.removeValue(forKey: clean)
+        if !removedEntries.contains(clean) { removedEntries.append(clean) }
+        message = "Quitado «\(clean)» del diccionario en todos tus Macs."
+        dictionaryChangedLocally(reloadEngine: hadTerm)
     }
     func saveCorrection(_ from: String, _ to: String) {
         let source = from.trimmingCharacters(in: .whitespacesAndNewlines)
         let destination = to.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !source.isEmpty, !destination.isEmpty else { return }
         corrections[source] = destination
-        UserDefaults.standard.set(corrections, forKey: "correcciones")
+        removedEntries.removeAll { $0 == source }
+        dictionaryChangedLocally(reloadEngine: false)
     }
     func importVocabulary() {
         let panel = NSOpenPanel()
@@ -419,14 +472,17 @@ private final class IndicatorPanel: NSPanel {
             let (rows, invalid) = DictionaryImportParser.parse(content)
             for row in rows {
                 switch row {
-                case .term(let term): if !vocabulary.contains(term) { vocabulary.append(term) }
-                case .correction(let source, let target): corrections[source] = target
+                case .term(let term):
+                    if !vocabulary.contains(term) { vocabulary.append(term) }
+                    removedEntries.removeAll { $0 == term }
+                case .correction(let source, let target):
+                    corrections[source] = target
+                    removedEntries.removeAll { $0 == source }
                 }
             }
-            UserDefaults.standard.set(vocabulary, forKey: "vocabulario")
-            UserDefaults.standard.set(corrections, forKey: "correcciones")
+            vocabulary.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
             message = "Importadas \(rows.count) entradas.\(invalid > 0 ? " Filas no válidas: \(invalid)." : "")"
-            if !busy { engine?.cancel(); engine = nil; preparing?.cancel(); preparing = nil; prepare() }
+            dictionaryChangedLocally(reloadEngine: true)
         } catch { message = "No se pudo leer el archivo: \(error.localizedDescription)" }
     }
     func shutdown() {
@@ -530,6 +586,7 @@ struct MainView: View {
                     HStack {
                         TextField("Nombre o término", text: $term)
                         Button("Añadir") { model.saveVocabulary(term); term = "" }.disabled(model.busy)
+                        Button("Quitar") { model.removeDictionaryEntry(term); term = "" }.disabled(model.busy || term.isEmpty)
                         Button("Importar TXT/CSV") { model.importVocabulary() }.disabled(model.busy)
                     }
                     Text(model.vocabulary.joined(separator: " · ")).font(.caption).textSelection(.enabled).lineLimit(4)
@@ -539,6 +596,9 @@ struct MainView: View {
                         Button("Guardar") { model.saveCorrection(from, to); from = ""; to = "" }.disabled(model.busy)
                     }
                     Text("Las sustituciones son explícitas. El reconocimiento y la revisión se realizan en el Mac.").font(.caption).foregroundStyle(.secondary)
+                    if !model.dictionaryStatus.isEmpty {
+                        Label(model.dictionaryStatus, systemImage: "icloud").font(.caption).foregroundStyle(.secondary)
+                    }
                 }.padding(.top, 8)
             }
             Text("Motor nativo de macOS · español · sin Whisper ni servicios de pago").font(.caption).foregroundStyle(.secondary)
@@ -590,6 +650,7 @@ private final class InstanceLock {
         editItem.submenu = editMenu
         NSApp.mainMenu = menuBar
         model.updater.start()
+        model.startDictionarySync()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Dictado Mac")
         let menu = NSMenu()
